@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<!-- saved from url=(0043)https://www.lncc.br/~borges/php/testar.html -->
+<html lang="pt-BR"><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+  
+  <title>Mouse Click Simulator</title>
+  <style>
+    body {
+      margin: 0;
+      background: #222;
+      color: white;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      flex-direction: column;
+      overflow: hidden;
+      transition: background 0.5s;
+    }
+    #counter { font-size: 40px; margin-bottom: 10px; }
+    #levelDisplay { font-size: 28px; margin-bottom: 10px; color: cyan; }
+    #recordDisplay { font-size: 24px; margin-bottom: 20px; color: orange; }
+    #levelMessage { font-size: 24px; margin-bottom: 20px; color: yellow; display: none; }
+    #shop {
+      display: none;
+      background: #333;
+      padding: 20px;
+      border-radius: 10px;
+      margin-top: 40px;
+      position: relative;
+      width: 300px;
+      text-align: center;
+    }
+    #shop button {
+      background: #ff9800;
+      color: black;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 18px;
+      margin-top: 10px;
+    }
+    #closeShop {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: red;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 16px;
+      line-height: 30px;
+      text-align: center;
+      padding: 0;
+    }
+    #clickBtn {
+      padding: 20px 40px;
+      font-size: 24px;
+      cursor: pointer;
+      background: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      transition: transform 0.1s;
+      z-index: 10;
+      margin-bottom: 20px;
+    }
+    #clickBtn:active { transform: scale(0.9); }
+    .arrow { position: absolute; width: 32px; height: 32px; pointer-events: none; }
+    #timer { font-size: 20px; color: lime; margin-top: 10px; display: none; }
+  </style>
+</head>
+<body>
+  <div id="counter">Cliques: 0</div>
+  <div id="levelDisplay">Nível: 0</div>
+  <div id="recordDisplay">Seu recorde: 0</div>
+  <div id="levelMessage"></div>
+  <button id="clickBtn" onclick="clickButton()">Clique aqui!</button>
+  <button onclick="openShop()">Abrir Loja</button>
+
+  <!-- Loja -->
+  <div id="shop">
+    <button id="closeShop" onclick="closeShop()">X</button>
+    <h2>Loja</h2>
+    <p>Auto Cliki (custa 50 cliques)</p>
+    <button onclick="buyAutoClick()">Comprar</button>
+    <p>1000 Pontos (custa 70 cliques, precisa 100 cliques acumulados)</p>
+    <button onclick="buyThousandPoints()">Comprar</button>
+  </div>
+
+  <!-- Timer -->
+  <div id="timer"></div>
+
+  <!-- Música de fundo -->
+  <audio id="bgMusic" src="https://files.catbox.moe/yh2sfi.mp3" autoplay="" loop=""></audio>
+
+  <!-- Som de clique -->
+  <audio id="clickSound" preload="auto">
+    <source src="https://files.catbox.moe/24wvfa.mp4" type="audio/mp4">
+  </audio>
+
+  <script>
+    let clicks = 0;
+    let level = 0;
+    let autoClickUnlocked = false;
+    let thousandPointsUnlocked = false;
+    let autoClickTimer = null;
+    let thousandPointsTimer = null;
+    let timeRemaining = 0;
+
+    // Carrega recorde salvo
+    let record = localStorage.getItem("record") || 0;
+    document.getElementById("recordDisplay").innerText = "Seu recorde: " + record;
+
+    function clickButton() {
+      clicks += autoClickUnlocked ? 500 : 1;
+      document.getElementById("counter").innerText = "Cliques: " + clicks;
+
+      // Som
+      const sound = document.getElementById("clickSound");
+      sound.currentTime = 0;
+      sound.play();
+
+      // Seta
+      const arrow = document.createElement("img");
+      arrow.src = "https://files.catbox.moe/bksdt9.jpg";
+      arrow.className = "arrow";
+      arrow.style.left = Math.random() * (window.innerWidth - 32) + "px";
+      arrow.style.top = Math.random() * (window.innerHeight - 32) + "px";
+      document.body.appendChild(arrow);
+
+      // Níveis
+      if (clicks % 50 === 0) {
+        level++;
+        document.getElementById("levelDisplay").innerText = "Nível: " + level;
+        const msg = document.getElementById("levelMessage");
+        msg.innerText = "Nível " + level + " alcançado!";
+        msg.style.display = "block";
+        const colors = ["#222","#333","#444","#550055","#005555","#555500","#880000","#008800"];
+        document.body.style.background = colors[Math.floor(Math.random()*colors.length)];
+        document.querySelectorAll(".arrow").forEach(el => el.remove());
+        setTimeout(() => { msg.style.display = "none"; }, 3000);
+      }
+
+      // Recorde
+      if (clicks > record) {
+        record = clicks;
+        localStorage.setItem("record", record);
+        document.getElementById("recordDisplay").innerText = "Seu recorde: " + record;
+      }
+    }
+
+    function openShop() { document.getElementById("shop").style.display = "block"; }
+    function closeShop() { document.getElementById("shop").style.display = "none"; }
+
+    function buyAutoClick() {
+      if (clicks >= 50 && !autoClickUnlocked) {
+        clicks -= 50;
+        autoClickUnlocked = true;
+        document.getElementById("shop").style.display = "none";
+        alert("Você comprou o Auto Cliki! Agora cada clique vale 500 por 10 minutos!");
+        timeRemaining = 10 * 60;
+        document.getElementById("timer").style.display = "block";
+        updateTimer();
+        autoClickTimer = setInterval(() => {
+          timeRemaining--;
+          updateTimer();
+          if (timeRemaining <= 0) {
+            clearInterval(autoClickTimer);
+            autoClickUnlocked = false;
+            document.getElementById("timer").style.display = "none";
+            alert("O Auto Cliki acabou! Voltou ao normal.");
+          }
+        }, 1000);
+      } else {
+        alert("Você não tem cliques suficientes!");
+      }
+    }
+
+    function buyThousandPoints() {
+      if (clicks >= 70 && !thousandPointsUnlocked && clicks >= 100) {
+        clicks -= 70;
+        thousandPointsUnlocked = true;
+        clicks += 1000; // bônus imediato
+        document.getElementById("counter").innerText = "Cliques: " + clicks;
+        document.getElementById("shop").style.display = "none";
+        alert("Você comprou 1000 Pontos! Eles duram 19 minutos.");
+        timeRemaining = 19 * 60;
+        document.getElementById("timer").style.display = "block";
+        updateTimer();
+        thousandPointsTimer = setInterval(() => {
+          timeRemaining--;
+          updateTimer();
+          if (timeRemaining <= 0) {
+            clearInterval(thousandPointsTimer);
+            thousandPointsUnlocked = false;
+            document.getElementById("timer").style.display = "none";
+            alert("Os 1000 Pontos acabaram!");
+          }
+        }, 1000);
+      } else {
+        alert("Você não tem cliques suficientes ou ainda não atingiu 100 cliques!");
+      }
+    }
+
+    function updateTimer() {
+      let minutes = Math.floor(timeRemaining / 60);
+      let seconds = timeRemaining % 60;
+      document.getElementById("timer").innerText = 
+        "Poder ativo: " + minutes + "m " + seconds + "s";
+    }
+  </script>
+
+
+
+
+		</body></html>
